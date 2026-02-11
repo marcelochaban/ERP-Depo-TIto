@@ -1,0 +1,56 @@
+services:
+  # Base de Datos MySQL
+  db:
+    image: mysql:8.0
+    container_name: tito-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${DB_PORT}:3306"
+    volumes:
+      - tito_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      
+
+  # Backend Spring Boot
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: tito-api
+    ports:
+      - "${BACKEND_PORT}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE}?allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      # JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - db
+    volumes:
+      - ./Backend:/app # Hot reload: refleja cambios de código inmediatamente
+
+  # Frontend Angular
+  frontend:
+    build:
+      context: ./FrontTito
+      dockerfile: Dockerfile
+    container_name: tito-ui
+    ports:
+      - "${FRONTEND_PORT}:4200"
+    depends_on:
+      - backend
+    volumes:
+      - ./FrontTito:/app # Hot reload
+      - /app/node_modules # Evita que se sobrescriban los módulos del contenedor
+
+volumes:
+  tito_db_data:
